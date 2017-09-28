@@ -21,6 +21,9 @@ package org.simpleframework.xml.stream;
 import java.io.InputStream;
 import java.io.Reader;
 
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.stream.XMLInputFactory;
+
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;
  
@@ -50,6 +53,8 @@ class PullProvider implements Provider {
    public PullProvider() throws Exception {
       this.factory = XmlPullParserFactory.newInstance();
       this.factory.setNamespaceAware(true);
+      // Security issue: block entities expansion that can lead to expose local files
+      this.factory.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false);
    }
    
    /**
