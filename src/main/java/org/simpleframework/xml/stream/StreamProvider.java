@@ -51,6 +51,8 @@ class StreamProvider implements Provider {
    public StreamProvider() {
       this.factory = XMLInputFactory.newInstance();
       // Security issue: block entities expansion that can lead to expose local files
+      // cf https://www.owasp.org/index.php/XML_External_Entity_(XXE)_Prevention_Cheat_Sheet#XMLInputFactory_.28a_StAX_parser.29
+      this.factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
       this.factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
    }
 
