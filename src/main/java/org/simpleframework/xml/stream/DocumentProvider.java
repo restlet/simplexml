@@ -18,14 +18,16 @@
 
 package org.simpleframework.xml.stream;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
-import org.w3c.dom.Document;
 import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 
 /**
  * The <code>DocumentProvider</code> object is used to provide event
@@ -54,6 +56,41 @@ class DocumentProvider implements Provider {
    public DocumentProvider() {
       this.factory = DocumentBuilderFactory.newInstance();
       this.factory.setNamespaceAware(true);
+
+        // Security issue: block entities expansion that can lead to expose local files
+        // cf https://www.owasp.org/index.php/XML_External_Entity_(XXE)_Prevention_Cheat_Sheet#Java
+        String FEATURE = null;
+        try {
+            // This is the PRIMARY defense. If DTDs (doctypes) are disallowed, almost all XML entity attacks are prevented
+            // Xerces 2 only - http://xerces.apache.org/xerces2-j/features.html#disallow-doctype-decl
+            FEATURE = "http://apache.org/xml/features/disallow-doctype-decl";
+            factory.setFeature(FEATURE, true);
+
+            // If you can't completely disable DTDs, then at least do the following:
+            // Xerces 1 - http://xerces.apache.org/xerces-j/features.html#external-general-entities
+            // Xerces 2 - http://xerces.apache.org/xerces2-j/features.html#external-general-entities
+            // JDK7+ - http://xml.org/sax/features/external-general-entities
+            FEATURE = "http://xml.org/sax/features/external-general-entities";
+            factory.setFeature(FEATURE, false);
+
+            // Xerces 1 - http://xerces.apache.org/xerces-j/features.html#external-parameter-entities
+            // Xerces 2 - http://xerces.apache.org/xerces2-j/features.html#external-parameter-entities
+            // JDK7+ - http://xml.org/sax/features/external-parameter-entities
+            FEATURE = "http://xml.org/sax/features/external-parameter-entities";
+            factory.setFeature(FEATURE, false);
+
+            // Disable external DTDs as well
+            FEATURE = "http://apache.org/xml/features/nonvalidating/load-external-dtd";
+            factory.setFeature(FEATURE, false);
+
+            // and these as well, per Timothy Morgan's 2014 paper: "XML Schema, DTD, and Entity Attacks"
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+        } catch (ParserConfigurationException e) {
+            throw new RuntimeException("ParserConfigurationException was thrown. The feature '" + FEATURE
+                    + "' is probably not supported by your XML processor.", e);
+        }
+
    }
    
    /**
@@ -93,9 +130,16 @@ class DocumentProvider implements Provider {
     * @return this is used to return the event reader implementation
     */
    private EventReader provide(InputSource source) throws Exception {
-      DocumentBuilder builder = factory.newDocumentBuilder();       
-      Document document = builder.parse(source);
-      
-      return new DocumentReader(document);   
-   }
+      DocumentBuilder builder = factory.newDocumentBuilder();
+
+        try {
+            return new DocumentReader(builder.parse(source));
+        } catch (SAXException e) {
+            // On Apache, this should be thrown when disallowing DOCTYPE
+            throw new RuntimeException("A DOCTYPE was passed into the XML document, and this is blocked on purpose due to security issues", e);
+        } catch (IOException e) {
+            // XXE that points to a file that doesn't exist
+            throw new RuntimeException("IOException occurred, XXE may still possible", e);
+        }
+    }
 }
