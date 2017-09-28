@@ -1,69 +1,50 @@
 package org.simpleframework.xml.stream;
 
-import junit.framework.TestCase;
-
+import org.junit.Assert;
+import org.junit.Test;
 import org.simpleframework.xml.Element;
 import org.simpleframework.xml.Root;
 import org.simpleframework.xml.Serializer;
 import org.simpleframework.xml.core.Persister;
+import org.simpleframework.xml.core.ValueRequiredException;
+import org.xmlpull.v1.XmlPullParserException;
 
-public class XxeSecurityTest extends TestCase {
+public class XxeSecurityTest {
 
-    public void test_when_using_persister_should_fail() throws Exception {
+    @Test
+    public void when_using_general_persister_should_fail() throws Exception {
         Serializer serializer = new Persister();
 
         try {
             serializer.read(MyObject.class, XxeSecurityTest.class.getResourceAsStream("xxeSecurityTest.xml"));
-            fail("An exception should be thrown");
-        } catch (Exception e) {
-            // fine, test is ok
-        }
-    }
-    
-    public void test_when_using_streamProvider_should_fail() throws Exception {
-        Serializer serializer = new Persister();
-        
-        try {
-            Provider provider = new StreamProvider();
-            EventReader eventReader = provider.provide(XxeSecurityTest.class.getResourceAsStream("xxeSecurityTest.xml"));
-            InputNode inputNode = new NodeReader(eventReader).readRoot();
-
-            serializer.read(MyObject.class, inputNode);
-            fail("An exception should be thrown");
-        } catch (Exception e) {
-            // fine, test is ok
-        }
-    }
-    
-
-    public void test_when_using_pullProvider_should_fail() throws Exception {
-        Serializer serializer = new Persister();
-
-        try {
-            Provider provider = new PullProvider();
-            EventReader eventReader = provider.provide(XxeSecurityTest.class.getResourceAsStream("xxeSecurityTest.xml"));
-            InputNode inputNode = new NodeReader(eventReader).readRoot();
-
-            serializer.read(MyObject.class, inputNode);
-            fail("An exception should be thrown");
+            Assert.fail("An exception should be thrown");
         } catch (Exception e) {
             // fine, test is ok
         }
     }
 
-    public void test_when_using_documentProvider_should_fail() throws Exception {
-        Serializer serializer = new Persister();
-        
-        try {
-            Provider provider = new DocumentProvider();
-            EventReader eventReader = provider.provide(XxeSecurityTest.class.getResourceAsStream("xxeSecurityTest.xml"));
-            InputNode inputNode = new NodeReader(eventReader).readRoot();
+    @Test(expected = ValueRequiredException.class)
+    public void when_using_streamProvider_should_fail() throws Exception {
+        checkProvider(new StreamProvider());
+    }
 
-            serializer.read(MyObject.class, inputNode);
-            fail("An exception should be thrown");
-        } catch (Exception e) {
-            // fine, test is ok
-        }
+    @Test(expected = XmlPullParserException.class)
+    public void when_using_pullProvider_should_fail() throws Exception {
+        checkProvider(new PullProvider());
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void when_using_documentProvider_should_fail() throws Exception {
+        checkProvider(new DocumentProvider());
+    }
+
+    private void checkProvider(Provider provider) throws Exception {
+        Serializer serializer = new Persister();
+
+        EventReader eventReader = provider.provide(XxeSecurityTest.class.getResourceAsStream("xxeSecurityTest.xml"));
+        InputNode inputNode = new NodeReader(eventReader).readRoot();
+
+        serializer.read(MyObject.class, inputNode);
     }
 
     @Root
